@@ -1,0 +1,15 @@
+[Unit]
+Description=ScodocAlert
+After=network.target
+
+[Service]
+# Replace 'pi' with your username if different
+User=pi
+WorkingDirectory=/home/pi/ScodocAlert
+# Ensure python3 is in the path or use absolute path
+ExecStart=/usr/bin/python3 /home/pi/ScodocAlert/src/main.py --loop
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+# Ignore Python virtual environment
+.venv
+__pycache__
+
+# Ignore logs
+*.log
+
+# Ignore state file
+scodoc_state.json
+
+# Ignore environment file
+.env
