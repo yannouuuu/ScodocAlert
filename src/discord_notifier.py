@@ -3,8 +3,9 @@ import json
 from datetime import datetime
 
 class DiscordNotifier:
-    def __init__(self, webhook_url):
+    def __init__(self, webhook_url, bulletin_url=None):
         self.webhook_url = webhook_url
+        self.bulletin_url = bulletin_url
 
     def send_notification(self, title, description, fields=None, color=0x0099cc, content=None):
         if not self.webhook_url:
@@ -71,6 +72,9 @@ class DiscordNotifier:
         if stats_bar:
              fields.append({"name": "Statistiques Promo", "value": stats_bar, "inline": False})
 
+        if self.bulletin_url:
+            fields.append({"name": "Lien", "value": f"[Consulter le bulletin]({self.bulletin_url})", "inline": False})
+
         self.send_notification(
             title="Nouvelle Note Publiée !",
             description=f"Une nouvelle note est disponible en **{module_name}**.",
@@ -83,13 +87,18 @@ class DiscordNotifier:
         """
         Helper to format a grade update notification.
         """
+        fields = [
+            # {"name": "Ancienne Note", "value": str(old_note), "inline": True}, # Hidden for privacy
+            # {"name": "Nouvelle Note", "value": f"**{new_note}**", "inline": True} # Hidden for privacy
+            {"name": "Info", "value": "Consultez votre relevé pour voir la modification.", "inline": False}
+        ]
+
+        if self.bulletin_url:
+            fields.append({"name": "Lien", "value": f"[Consulter le bulletin]({self.bulletin_url})", "inline": False})
+
         self.send_notification(
             title="Note Modifiée",
             description=f"La note de **{evaluation_name}** ({module_name}) a été modifiée.",
-            fields=[
-                # {"name": "Ancienne Note", "value": str(old_note), "inline": True}, # Hidden for privacy
-                # {"name": "Nouvelle Note", "value": f"**{new_note}**", "inline": True} # Hidden for privacy
-                {"name": "Info", "value": "Consultez votre relevé pour voir la modification.", "inline": False}
-            ],
-            color=0xffa500 # Orange
+            fields=fields,
+            color=0xffa500
         )
