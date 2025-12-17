@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from config import SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URL, VERIFY_SSL, BULLETIN_URL
+from config import SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URL, VERIFY_SSL, BULLETIN_URL, SEMESTER_INDEX
 from gateway_client import GatewayClient
 from discord_notifier import DiscordNotifier
 import urllib3
@@ -40,9 +40,9 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
         note_data = eval_item.get('note', {})
         note_value = note_data.get('value')
         
-        # Skip if no note value (or empty)
-        if not note_value:
-            continue
+        # Use None as default for evaluations without notes yet
+        if note_value is None or note_value == "":
+            note_value = None
 
         # Construct a unique key for this evaluation
         # We use ID, but storing the value allows detecting updates
@@ -50,9 +50,26 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
 
         # Case 1: New evaluation we haven't seen
         if eval_id not in state:
-            print(f"New evaluation found: {module_title} - {eval_desc} ({note_value})")
-            # Only notify if it's not a placeholder "~" (unless you want to notify for placeholders too)
-            if note_value != "~":
+            if note_value is not None and note_value != "":
+                print(f"New evaluation found: {module_title} - {eval_desc} ({note_value})")
+                # Only notify if it's not a placeholder "~" (unless you want to notify for placeholders too)
+                if note_value != "~":
+                    notifier.notify_new_grade(
+                        module_name=f"{module_code} - {module_title}",
+                        evaluation_name=eval_desc,
+                        note=note_value,
+                        mean=note_data.get('moy'),
+                        min_note=note_data.get('min'),
+                        max_note=note_data.get('max'),
+                        mention_everyone=not is_initialization  # Don't mention during init
+                    )
+            state[eval_id] = note_value
+        
+        # Case 2: Existing evaluation, value changed
+        elif stored_value != note_value:
+            # If there was no note and now there is one
+            if stored_value is None and note_value is not None and note_value != "" and note_value != "~":
+                print(f"New grade added: {module_title} - {eval_desc} ({note_value})")
                 notifier.notify_new_grade(
                     module_name=f"{module_code} - {module_title}",
                     evaluation_name=eval_desc,
@@ -60,17 +77,12 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
                     mean=note_data.get('moy'),
                     min_note=note_data.get('min'),
                     max_note=note_data.get('max'),
-                    mention_everyone=not is_initialization  # Don't mention during init
+                    mention_everyone=True  # Always mention for new grades
                 )
-            state[eval_id] = note_value
-        
-        # Case 2: Existing evaluation, value changed
-        elif stored_value != note_value:
-            print(f"Grade updated: {module_title} - {eval_desc} ({stored_value} -> {note_value})")
-            
             # If it was "~" and now is a real grade, treat as new grade
-            if stored_value == "~" and note_value != "~":
-                 notifier.notify_new_grade(
+            elif stored_value == "~" and note_value not in [None, "~", ""]:
+                print(f"Grade updated: {module_title} - {eval_desc} ({stored_value} -> {note_value})")
+                notifier.notify_new_grade(
                     module_name=f"{module_code} - {module_title}",
                     evaluation_name=eval_desc,
                     note=note_value,
@@ -80,12 +92,23 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
                     mention_everyone=True  # Always mention for updates
                 )
             # If it changed from one real grade to another
-            elif stored_value != "~" and note_value != "~":
+            elif stored_value not in [None, "~", ""] and note_value not in [None, "~", ""]:
+                print(f"Grade updated: {module_title} - {eval_desc} ({stored_value} -> {note_value})")
                 notifier.notify_grade_update(
                     module_name=f"{module_code} - {module_title}",
                     evaluation_name=eval_desc,
                     old_note=stored_value,
                     new_note=note_value
+                )
+            # If a real grade was removed or set back to pending
+            elif stored_value not in [None, "~", ""] and note_value in [None, "~", ""]:
+                new_status = "supprimée" if note_value in [None, ""] else "en attente"
+                print(f"Grade removed/pending: {module_title} - {eval_desc} ({stored_value} -> {new_status})")
+                notifier.notify_grade_update(
+                    module_name=f"{module_code} - {module_title}",
+                    evaluation_name=eval_desc,
+                    old_note=stored_value,
+                    new_note=f"Note {new_status}"
                 )
             
             state[eval_id] = note_value
@@ -119,13 +142,35 @@ def main():
                 if not semesters:
                     print("No semesters found.")
                 else:
-                    # Check the latest semester
-                    latest_sem = semesters[-1]
-                    sem_id = latest_sem['formsemestre_id']
-                    print(f"Checking semester: {latest_sem['titre']} ({sem_id})")
+                    # Display all available semesters
+                    print(f"Available semesters ({len(semesters)}):")
+                    for idx, sem in enumerate(semesters):
+                        print(f"  [{idx}] {sem['titre']} (ID: {sem['formsemestre_id']})")
+                    
+                    # Select semester based on SEMESTER_INDEX
+                    try:
+                        selected_sem = semesters[SEMESTER_INDEX]
+                        sem_id = selected_sem['formsemestre_id']
+                        print(f"\n→ Checking semester: {selected_sem['titre']} (ID: {sem_id})")
+                    except IndexError:
+                        print(f"Error: SEMESTER_INDEX {SEMESTER_INDEX} is out of range (0-{len(semesters)-1})")
+                        print("Using last semester as fallback.")
+                        selected_sem = semesters[-1]
+                        sem_id = selected_sem['formsemestre_id']
+                        print(f"→ Checking semester: {selected_sem['titre']} (ID: {sem_id})")
                     
                     grades_data = client.get_grades(sem_id)
                     releve = grades_data.get('relevé', {})
+                    
+                    # Check if notes are published
+                    publie = releve.get('publie', False)
+                    message = releve.get('message', '')
+                    
+                    if not publie:
+                        print(f"⚠️  Les notes ne sont pas publiées pour ce semestre.")
+                        if message:
+                            print(f"   Message: {message}")
+                        print(f"   Le fichier d'état restera vide jusqu'à la publication des notes.")
                     
                     # Process Ressources (R1.01, etc.)
                     ressources = releve.get('ressources', {})
@@ -138,7 +183,10 @@ def main():
                         process_evaluations(sae, code, sae['titre'], state, notifier, is_initialization)
                         
                     save_state(state)
-                    print("Check complete. State saved.")
+                    if len(state) > 0:
+                        print(f"✓ Check complete. {len(state)} evaluations tracked in state file.")
+                    else:
+                        print("✓ Check complete. No evaluations to track yet.")
 
         except Exception as e:
             print(f"An error occurred: {e}")
