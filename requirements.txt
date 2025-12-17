@@ -1,3 +1,5 @@
 requests
 beautifulsoup4
 python-dotenv
+pytest>=9.0.0
+pytest-mock>=3.14.0

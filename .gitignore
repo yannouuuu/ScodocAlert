@@ -1,6 +1,14 @@
 # Ignore Python virtual environment
 .venv
+venv
 __pycache__
+*.pyc
+*.pyo
+
+# Ignore pytest cache
+.pytest_cache
+.coverage
+htmlcov/
 
 # Ignore logs
 *.log
