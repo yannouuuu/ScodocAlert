@@ -19,7 +19,7 @@ class TestDiscordNotifier:
         
         notifier = DiscordNotifier(webhook_url, bulletin_url)
         
-        assert notifier.webhook_url == webhook_url
+        assert notifier.webhook_urls == [webhook_url]
         assert notifier.bulletin_url == bulletin_url
     
     def test_initialization_without_bulletin_url(self):
@@ -28,7 +28,7 @@ class TestDiscordNotifier:
         
         notifier = DiscordNotifier(webhook_url)
         
-        assert notifier.webhook_url == webhook_url
+        assert notifier.webhook_urls == [webhook_url]
         assert notifier.bulletin_url is None
     
     @patch('discord_notifier.requests.post')
@@ -151,3 +151,18 @@ class TestDiscordNotifier:
         data = call_args[1]['data']
         # Les caractères accentués sont encodés en unicode dans le JSON
         assert "Note Modifi" in data or "Modifi\\u00e9e" in data
+
+    @patch('discord_notifier.requests.post')
+    def test_send_notification_multiple_webhooks(self, mock_post):
+        """Vérifie l'envoi vers plusieurs webhooks."""
+        webhook_urls = ["https://discord.com/webhook1", "https://discord.com/webhook2"]
+        notifier = DiscordNotifier(webhook_urls)
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_post.return_value = mock_response
+        
+        notifier.send_notification("Title", "Description")
+        
+        assert mock_post.call_count == 2
+

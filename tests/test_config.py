@@ -28,13 +28,14 @@ class TestConfig:
         # Import après avoir défini les variables
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-        from config import (SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URL, 
+        from config import (SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URL, DISCORD_WEBHOOK_URLS,
                            BULLETIN_URL, VERIFY_SSL, SEMESTER_INDEX)
         
         assert SCODOC_URL == "https://test.scodoc.com"
         assert USERNAME == "testuser"
         assert PASSWORD == "testpass"
         assert DISCORD_WEBHOOK_URL == "https://discord.com/webhook"
+        assert DISCORD_WEBHOOK_URLS == ["https://discord.com/webhook"]
         assert BULLETIN_URL == "https://bulletin.url"
         assert VERIFY_SSL is False
         assert SEMESTER_INDEX == -1
@@ -59,3 +60,22 @@ class TestConfig:
         # Vérifier seulement les valeurs qui ne dépendent pas du .env
         assert VERIFY_SSL is True
         assert SEMESTER_INDEX == -2
+
+    @patch.dict(os.environ, {
+        "DISCORD_WEBHOOK_URL": "https://discord.com/1,https://discord.com/2"
+    })
+    def test_config_multiple_webhooks(self):
+        """Vérifie le parsing de plusieurs webhooks."""
+        import sys
+        if 'src.config' in sys.modules:
+            del sys.modules['src.config']
+        if 'config' in sys.modules:
+            del sys.modules['config']
+            
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+        from config import DISCORD_WEBHOOK_URLS
+        
+        assert len(DISCORD_WEBHOOK_URLS) == 2
+        assert DISCORD_WEBHOOK_URLS[0] == "https://discord.com/1"
+        assert DISCORD_WEBHOOK_URLS[1] == "https://discord.com/2"
+

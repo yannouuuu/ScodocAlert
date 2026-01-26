@@ -3,12 +3,15 @@ import json
 from datetime import datetime
 
 class DiscordNotifier:
-    def __init__(self, webhook_url, bulletin_url=None):
-        self.webhook_url = webhook_url
+    def __init__(self, webhook_urls, bulletin_url=None):
+        if isinstance(webhook_urls, str):
+            self.webhook_urls = [webhook_urls]
+        else:
+            self.webhook_urls = webhook_urls or []
         self.bulletin_url = bulletin_url
 
     def send_notification(self, title, description, fields=None, color=0x0099cc, content=None):
-        if not self.webhook_url:
+        if not self.webhook_urls:
             print("No Discord Webhook URL configured. Skipping notification.")
             return
 
@@ -32,16 +35,17 @@ class DiscordNotifier:
         if content:
             payload["content"] = content
 
-        try:
-            response = requests.post(
-                self.webhook_url,
-                data=json.dumps(payload),
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
-            print(f"Notification sent: {title}")
-        except Exception as e:
-            print(f"Failed to send Discord notification: {e}")
+        for webhook_url in self.webhook_urls:
+            try:
+                response = requests.post(
+                    webhook_url,
+                    data=json.dumps(payload),
+                    headers={"Content-Type": "application/json"}
+                )
+                response.raise_for_status()
+                print(f"Notification sent to one webhook: {title}")
+            except Exception as e:
+                print(f"Failed to send Discord notification to {webhook_url}: {e}")
 
     def generate_stats_bar(self, min_note, avg_note, max_note):
         """

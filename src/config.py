@@ -8,6 +8,11 @@ CAS_URL = os.getenv("CAS_URL", "https://cas.example.com") # Default, might need 
 USERNAME = os.getenv("SCODOC_USER")
 PASSWORD = os.getenv("SCODOC_PASSWORD")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+if DISCORD_WEBHOOK_URL:
+    # Support multiple webhooks separated by commas
+    DISCORD_WEBHOOK_URLS = [url.strip() for url in DISCORD_WEBHOOK_URL.split(",") if url.strip()]
+else:
+    DISCORD_WEBHOOK_URLS = []
 BULLETIN_URL = os.getenv("BULLETIN_URL")
 VERIFY_SSL = os.getenv("VERIFY_SSL", "True").lower() == "true"
 # Semester selection: -1 for latest, -2 for second to last, 0 for first, 1 for second, etc.

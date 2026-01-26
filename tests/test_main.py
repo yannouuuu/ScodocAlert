@@ -333,3 +333,4 @@ class TestProcessEvaluations:
         # Notification de suppression
         assert notifier.notify_grade_update.called
         assert state['eval1'] is None
+

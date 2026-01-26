@@ -124,3 +124,4 @@ class TestCASClient:
         
         assert session is not None
         assert session == client.session
+

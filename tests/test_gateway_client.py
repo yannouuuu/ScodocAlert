@@ -135,3 +135,4 @@ class TestGatewayClient:
         
         with pytest.raises(Exception, match="Failed to fetch grades"):
             client.get_grades(123)
+

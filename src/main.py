@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from config import SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URL, VERIFY_SSL, BULLETIN_URL, SEMESTER_INDEX
+from config import SCODOC_URL, USERNAME, PASSWORD, DISCORD_WEBHOOK_URLS, VERIFY_SSL, BULLETIN_URL, SEMESTER_INDEX
 from gateway_client import GatewayClient
 from discord_notifier import DiscordNotifier
 import urllib3
@@ -121,7 +121,7 @@ def main():
     args = parser.parse_args()
 
     print("Starting ScodocAlert...")
-    notifier = DiscordNotifier(DISCORD_WEBHOOK_URL, BULLETIN_URL)
+    notifier = DiscordNotifier(DISCORD_WEBHOOK_URLS, BULLETIN_URL)
     
     client = GatewayClient(SCODOC_URL, USERNAME, PASSWORD, verify_ssl=VERIFY_SSL)
     
