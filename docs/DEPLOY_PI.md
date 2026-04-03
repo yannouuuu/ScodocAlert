@@ -63,6 +63,7 @@ Pour que le script se lance au démarrage et redémarre en cas de crash :
     ```bash
     journalctl -u scodoc-alert -f
     ```
+    > **Note**: Ctrl+C arrête seulement l'affichage des logs, pas le service. Le service continue de tourner en arrière-plan.
 
 ## Lancement Automatique (SysVinit)
 
@@ -182,6 +183,7 @@ Pour les systèmes Devuan (par défaut) ou autres utilisant SysVinit au lieu de 
     ```bash
     tail -f /var/log/scodoc-alert.log
     ```
+    > **Note**: Ctrl+C arrête seulement l'affichage des logs, pas le service. Le service continue de tourner en arrière-plan.
 
 **Commandes utiles pour SysVinit** :
 - Démarrer : `sudo service scodoc-alert start`
@@ -252,6 +254,7 @@ Pour les systèmes Devuan avec OpenRC ou autres distributions utilisant OpenRC (
     ```bash
     tail -f /var/log/scodoc-alert.log
     ```
+    > **Note**: Ctrl+C arrête seulement l'affichage des logs, pas le service. Le service continue de tourner en arrière-plan.
 
 **Commandes utiles pour OpenRC** :
 - Démarrer : `sudo rc-service scodoc-alert start`
