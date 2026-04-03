@@ -14,6 +14,34 @@ class CASClient:
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
+    def _extract_error_message(self, soup):
+        selectors = [
+            '[role="alert"]',
+            '.errors',
+            '.error',
+            '.alert',
+            '.alert-danger',
+            '.alert-error',
+            '.message',
+            '.messagebox',
+            '#msg',
+            '#loginErrorsPanel',
+            '#formErrors',
+        ]
+
+        for selector in selectors:
+            for node in soup.select(selector):
+                text = " ".join(node.get_text(" ", strip=True).split())
+                if text:
+                    return text
+
+        page_text = " ".join(soup.get_text(" ", strip=True).split())
+        keywords = ("erreur", "error", "echec", "échec", "invalid", "incorrect")
+        if any(keyword in page_text.lower() for keyword in keywords):
+            return page_text[:300]
+
+        return None
+
     def login(self, trigger_path="/auth/login"):
         """
         Performs the CAS login flow.
@@ -86,6 +114,7 @@ class CASClient:
         # Important: Referer header is often checked
         self.session.headers.update({'Referer': cas_login_url})
         post_response = self.session.post(post_url, data=payload)
+        post_soup = BeautifulSoup(post_response.text, 'html.parser')
 
         # 4. Check result
         if "TGC" in self.session.cookies or "scodoc_session" in self.session.cookies:
@@ -97,12 +126,16 @@ class CASClient:
             print("Login successful (Redirected back to service).")
             return True
 
-        # Debug failure
-        if "erreur" in post_response.text.lower() or "error" in post_response.text.lower() or "échec" in post_response.text.lower():
-            print("Login failed: Error message found in response.")
-            # print(post_response.text[:500]) # Debug
+        error_message = self._extract_error_message(post_soup)
+        if error_message:
+            print(f"Login failed: {error_message}")
             return False
-            
+
+        if "cas" in post_response.url and post_soup.find('form', id='fm1'):
+            print("Login failed: still on the CAS login form after submitting credentials.")
+            print(f"Final URL: {post_response.url}")
+            return False
+
         print("Login status uncertain. Final URL:", post_response.url)
         return True # Optimistic return, API calls will fail if not actually logged in
 

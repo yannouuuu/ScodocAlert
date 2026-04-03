@@ -125,3 +125,57 @@ class TestCASClient:
         assert session is not None
         assert session == client.session
 
+    @patch('cas_client.requests.Session.post')
+    @patch('cas_client.requests.Session.get')
+    def test_login_extracts_cas_error_message(self, mock_get, mock_post):
+        """Vérifie qu'un vrai message d'erreur CAS est détecté."""
+        mock_get_response = Mock()
+        mock_get_response.status_code = 200
+        mock_get_response.url = "https://cas.test.com/login"
+        mock_get_response.text = '<form id="fm1"><input name="username"/><input name="password"/></form>'
+        mock_get.return_value = mock_get_response
+
+        mock_post_response = Mock()
+        mock_post_response.status_code = 200
+        mock_post_response.url = "https://cas.test.com/login"
+        mock_post_response.text = '''
+        <html>
+            <body>
+                <div class="alert alert-danger">Identifiants invalides.</div>
+                <form id="fm1"></form>
+            </body>
+        </html>
+        '''
+        mock_post.return_value = mock_post_response
+
+        client = CASClient("https://scodoc.test.com", "user", "pass")
+        result = client.login()
+
+        assert result is False
+
+    @patch('cas_client.requests.Session.post')
+    @patch('cas_client.requests.Session.get')
+    def test_login_does_not_fail_on_generic_error_word(self, mock_get, mock_post):
+        """Vérifie qu'un mot générique comme 'error' ne provoque pas un faux négatif."""
+        mock_get_response = Mock()
+        mock_get_response.status_code = 200
+        mock_get_response.url = "https://cas.test.com/login?service=..."
+        mock_get_response.text = '''
+        <form id="fm1" action="/cas/login">
+            <input name="execution" value="e1s1" />
+            <input name="username" />
+            <input name="password" />
+        </form>
+        '''
+        mock_get.return_value = mock_get_response
+
+        mock_post_response = Mock()
+        mock_post_response.status_code = 200
+        mock_post_response.url = "https://scodoc.test.com/authenticated"
+        mock_post_response.text = '<script>const errorLevel = "none";</script>'
+        mock_post.return_value = mock_post_response
+
+        client = CASClient("https://scodoc.test.com", "user", "pass")
+        result = client.login()
+
+        assert result is True

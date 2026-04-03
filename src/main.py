@@ -52,7 +52,7 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
         if eval_id not in state:
             if note_value is not None and note_value != "":
                 print(f"New evaluation found: {module_title} - {eval_desc} ({note_value})")
-                # Only notify if it's not a placeholder "~" (unless you want to notify for placeholders too)
+                # Only notify if it's not a placeholder "~"
                 if note_value != "~":
                     notifier.notify_new_grade(
                         module_name=f"{module_code} - {module_title}",
@@ -102,13 +102,13 @@ def process_evaluations(resource_dict, module_code, module_title, state, notifie
                 )
             # If a real grade was removed or set back to pending
             elif stored_value not in [None, "~", ""] and note_value in [None, "~", ""]:
-                new_status = "supprimée" if note_value in [None, ""] else "en attente"
+                new_status = "removed" if note_value in [None, ""] else "pending"
                 print(f"Grade removed/pending: {module_title} - {eval_desc} ({stored_value} -> {new_status})")
                 notifier.notify_grade_update(
                     module_name=f"{module_code} - {module_title}",
                     evaluation_name=eval_desc,
                     old_note=stored_value,
-                    new_note=f"Note {new_status}"
+                    new_note=f"Grade {new_status}"
                 )
             
             state[eval_id] = note_value
@@ -117,7 +117,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="ScodocAlert - Grade Monitor")
-    parser.add_argument("--loop", action="store_true", help="Run in a continuous loop every 10 minutes")
+    parser.add_argument("--loop", action="store_true", help="Run in a continuous loop every 5 minutes")
     args = parser.parse_args()
 
     print("Starting ScodocAlert...")
@@ -142,37 +142,94 @@ def main():
                 if not semesters:
                     print("No semesters found.")
                 else:
-                    # Display all available semesters
-                    print(f"Available semesters ({len(semesters)}):")
+                    # Display all available semesters with clear formatting
+                    print("\n" + "="*70)
+                    print(f"AVAILABLE SEMESTERS ({len(semesters)} found)")
+                    print("="*70)
+                    
                     for idx, sem in enumerate(semesters):
-                        print(f"  [{idx}] {sem['titre']} (ID: {sem['formsemestre_id']})")
+                        # Calculate negative index
+                        neg_idx = idx - len(semesters)
+                        
+                        # Highlight if this is the selected semester
+                        is_selected = (SEMESTER_INDEX >= 0 and idx == SEMESTER_INDEX) or \
+                                     (SEMESTER_INDEX < 0 and neg_idx == SEMESTER_INDEX)
+                        
+                        marker = "-> SELECTED" if is_selected else ""
+                        
+                        print(f"\n┌─ Semester #{idx + 1} (index: {idx} or {neg_idx}) {marker}")
+                        print(f"│  {sem.get('titre', 'N/A')}")
+                        
+                        # Display key information first
+                        if 'semestre_id' in sem:
+                            print(f"│  Semester: S{sem['semestre_id']}")
+                        if 'annee_scolaire' in sem:
+                            print(f"│  Year: {sem['annee_scolaire']}")
+                        if 'date_debut' in sem and 'date_fin' in sem:
+                            print(f"│  Period: {sem['date_debut']} -> {sem['date_fin']}")
+                        if 'modalite' in sem:
+                            print(f"│  Mode: {sem['modalite']}")
+                        if 'etat' in sem:
+                            etat_status = "Active" if sem['etat'] else "Inactive"
+                            print(f"│  Status: {etat_status}")
+                        
+                        print(f"│  Scodoc ID: {sem.get('formsemestre_id', 'N/A')}")
+                        
+                        # Additional info
+                        if 'elt_sem_apo' in sem and sem['elt_sem_apo']:
+                            print(f"│  Apogee Code: {sem['elt_sem_apo']}")
+                        
+                        print("└" + "─"*65)
+                    
+                    print("\n" + "="*70)
+                    print("HELP: How to choose a semester in .env")
+                    print("="*70)
+                    print("Positive indices (fixed):")
+                    for idx in range(len(semesters)):
+                        print(f"  SEMESTER_INDEX={idx}  -> Semester #{idx + 1}")
+                    print("\nNegative indices (relative, recommended):")
+                    for idx in range(len(semesters)):
+                        neg_idx = idx - len(semesters)
+                        position = "last" if neg_idx == -1 else f"{abs(neg_idx)}th from the end"
+                        print(f"  SEMESTER_INDEX={neg_idx}  -> {position} (currently Semester #{idx + 1})")
+                    print("="*70 + "\n")
                     
                     # Select semester based on SEMESTER_INDEX
                     try:
                         selected_sem = semesters[SEMESTER_INDEX]
                         sem_id = selected_sem['formsemestre_id']
-                        print(f"\n→ Checking semester: {selected_sem['titre']} (ID: {sem_id})")
+                        sem_number = semesters.index(selected_sem) + 1
+                        print(f"\n>>> CHECKING SEMESTER #{sem_number}")
+                        print(f"   {selected_sem['titre']}")
+                        if 'semestre_id' in selected_sem:
+                            print(f"   S{selected_sem['semestre_id']}", end="")
+                        if 'annee_scolaire' in selected_sem:
+                            print(f" - {selected_sem['annee_scolaire']}", end="")
+                        print(f"\n   ID: {sem_id}\n")
                     except IndexError:
-                        print(f"Error: SEMESTER_INDEX {SEMESTER_INDEX} is out of range (0-{len(semesters)-1})")
-                        print("Using last semester as fallback.")
+                        print(f"\n!!! ERROR: SEMESTER_INDEX={SEMESTER_INDEX} is invalid!")
+                        print(f"   Valid values: 0 to {len(semesters)-1} or -{len(semesters)} to -1")
+                        print(f"   >>> Using last semester as fallback.\n")
                         selected_sem = semesters[-1]
                         sem_id = selected_sem['formsemestre_id']
-                        print(f"→ Checking semester: {selected_sem['titre']} (ID: {sem_id})")
+                        sem_number = len(semesters)
+                        print(f">>> CHECKING SEMESTER #{sem_number} (fallback)")
+                        print(f"   {selected_sem['titre']} (ID: {sem_id})\n")
                     
                     grades_data = client.get_grades(sem_id)
                     releve = grades_data.get('relevé', {})
                     
-                    # Check if notes are published
+                    # Check if grades are published
                     publie = releve.get('publie', False)
                     message = releve.get('message', '')
                     
                     if not publie:
-                        print(f"⚠️  Les notes ne sont pas publiées pour ce semestre.")
+                        print(f"WARNING: Grades are not published for this semester.")
                         if message:
                             print(f"   Message: {message}")
-                        print(f"   Le fichier d'état restera vide jusqu'à la publication des notes.")
+                        print(f"   State file will remain empty until grades are published.")
                     
-                    # Process Ressources (R1.01, etc.)
+                    # Process Resources (R1.01, etc.)
                     ressources = releve.get('ressources', {})
                     for code, res in ressources.items():
                         process_evaluations(res, code, res['titre'], state, notifier, is_initialization)
@@ -184,9 +241,9 @@ def main():
                         
                     save_state(state)
                     if len(state) > 0:
-                        print(f"✓ Check complete. {len(state)} evaluations tracked in state file.")
+                        print(f"OK - Check complete. {len(state)} evaluations tracked in state file.")
                     else:
-                        print("✓ Check complete. No evaluations to track yet.")
+                        print("OK - Check complete. No evaluations to track yet.")
 
         except Exception as e:
             print(f"An error occurred: {e}")
@@ -197,7 +254,7 @@ def main():
             break
             
         print("Waiting 5 minutes...")
-        time.sleep(300) # 5 minutes
+        time.sleep(300)  # 5 minutes
 
 if __name__ == "__main__":
     main()
